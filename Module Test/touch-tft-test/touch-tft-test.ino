@@ -99,6 +99,7 @@ constexpr int TOUCH_ACTIVE_LEVEL = HIGH;
 constexpr uint32_t TOUCH_STABLE_MS = 40;
 constexpr uint32_t TOUCH_STARTUP_MS = 700;
 constexpr uint32_t SLIDE_MS = 640;
+constexpr uint32_t PAGE_HOLD_MS = 4000;
 constexpr uint32_t SLIDE_FRAME_MS = 20;
 
 constexpr char WIFI_SSID[] = "KMUTT-Secure";
@@ -113,6 +114,7 @@ constexpr time_t FIRST_VALID_TIME = 1704067200;  // 2024-01-01 UTC
 Page currentPage = Page::Spider;
 Page incomingPage = Page::Spider;
 bool sliding = false;
+uint32_t pageShownAt = 0;
 uint32_t slideStartedAt = 0;
 uint32_t lastSlideFrameAt = 0;
 bool stableTouched = false;
@@ -353,13 +355,17 @@ void setup() {
   stableTouched = digitalRead(TOUCH_PIN) == TOUCH_ACTIVE_LEVEL;
   candidateTouched = stableTouched;
   candidateSince = millis();
-  Serial.println("Ready. Touch to cycle Spider > Clock > hello / world.");
+  pageShownAt = candidateSince;
+  Serial.println("Ready. Auto cycle: Spider > Clock > hello / world. Touch to skip.");
 }
 
 void loop() {
   updateClock();
   const uint32_t now = millis();
   updateTouch(now);
+  if (!sliding && now - pageShownAt >= PAGE_HOLD_MS) {
+    startNextPage(now);
+  }
   if (sliding) {
     const uint32_t elapsed = now - slideStartedAt;
     if (elapsed >= SLIDE_MS) {
@@ -367,6 +373,7 @@ void loop() {
       currentPage = incomingPage;
       sliding = false;
       lastPulseAt = millis();
+      pageShownAt = lastPulseAt;
     } else if (now - lastSlideFrameAt >= SLIDE_FRAME_MS) {
       lastSlideFrameAt = now;
       drawSlideFrame(slideOffset(elapsed));
