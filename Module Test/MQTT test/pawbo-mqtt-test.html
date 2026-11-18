@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Control</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap');
+  :root {
+    color-scheme: dark;
+    --bg: #080808;
+    --panel: #111111;
+    --field: #090909;
+    --border: #262626;
+    --text: #f2f2f2;
+    --muted: #858585;
+    --accent: #bbf451;
+    --red: #ff5964;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Noto Sans Thai", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 48px 28px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 20px;
+  }
+  main > h1 {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: clamp(28px, 4vw, 42px);
+    font-weight: 700;
+    letter-spacing: -1.5px;
+  }
+  main > p {
+    grid-column: 1 / -1;
+    margin: -12px 0 16px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .card {
+    min-width: 0;
+    padding: 26px;
+    margin: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+  }
+  /* แผงเชื่อมต่อ: ซ้ายบน */
+  .card:nth-of-type(1) {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  /* แผงควบคุม: ขวา */
+  .card:nth-of-type(2) {
+    grid-column: 2;
+    grid-row: 3 / span 2;
+    display: flex;
+    flex-direction: column;
+  }
+  /* ข้อมูลตอบกลับ: ซ้ายล่าง */
+  .card:nth-of-type(3) {
+    grid-column: 1;
+    grid-row: 4;
+  }
+  h2 {
+    margin: 0 0 24px;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -.4px;
+  }
+  h3 {
+    margin: 24px 0 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  label {
+    display: block;
+    margin: 17px 0 8px;
+    color: #b4b4b4;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  input,
+  button {
+    font: inherit;
+  }
+  input:not([type="range"]) {
+    display: block;
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    outline: none;
+    background: var(--field);
+    color: var(--text);
+    font-size: 13px;
+    transition: border-color .18s, box-shadow .18s;
+  }
+  input::placeholder {
+    color: #555;
+  }
+  input:not([type="range"]):focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgb(187 244 81 / 8%);
+  }
+  button {
+    min-height: 44px;
+    padding: 11px 17px;
+    border: 1px solid #333;
+    border-radius: 11px;
+    background: #202020;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      **background** .15s,
+      border-color .15s,
+      transform .15s;
+  }
+  button:not(:disabled):hover {
+    background: #2b2b2b;
+    border-color: #555;
+  }
+  button:not(:disabled):active {
+    transform: translateY(1px);
+  }
+  button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
+  button:disabled {
+    opacity: .3;
+    cursor: not-allowed;
+  }
+  .row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+  .row button {
+    flex: 1;
+  }
+  .primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #111;
+  }
+  .primary:not(:disabled):hover {
+    background: #cffb7d;
+    border-color: #cffb7d;
+  }
+  #disconnect {
+    background: transparent;
+    color: #aaa;
+  }
+  #connection {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  #connection::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  /* แถบความเร็ว */
+  label[for="speed"] {
+    margin-top: 0;
+    font-size: 13px;
+  }
+  #speedValue {
+    margin-left: 6px;
+    color: var(--accent);
+    font-size: 24px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  input[type="range"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    margin: 18px 0 10px;
+    border-radius: 20px;
+    outline: none;
+    background: #333;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 19px;
+    height: 19px;
+    border: 4px solid var(--panel);
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 13px;
+    height: 13px;
+    border: 3px solid var(--panel);
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  /* ชุดปุ่มทิศทาง */
+  .pad {
+    display: grid;
+    grid-template-columns: repeat(3, 88px);
+    gap: 12px;
+    justify-content: center;
+    align-content: center;
+    flex: 1;
+    min-height: 345px;
+    margin: 28px 0 16px;
+    padding: 25px;
+    border: 1px solid #222;
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at center, #1b1b1b 0%, #0d0d0d 72%);
+  }
+  .pad button {
+    display: grid;
+    place-items: center;
+    height: 80px;
+    padding: 0;
+    border: 1px solid #343434;
+    border-radius: 16px;
+    background: #202020;
+    color: #d8d8d8;
+    font-size: 25px;
+    box-shadow: 0 4px 0 #050505;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .pad button:not(:disabled):hover {
+    border-color: #777;
+    background: #292929;
+  }
+  .pad button.active,
+  .pad button.active:hover {
+    transform: translateY(3px);
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #111;
+    box-shadow: 0 1px 0 #050505;
+  }
+  .pad #stop {
+    border-color: #743137;
+    background: #30191c;
+    color: #ff8890;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .pad #stop:not(:disabled):hover {
+    border-color: var(--red);
+    background: #472126;
+  }
+  .card:nth-of-type(2) > p {
+    margin: 0 0 20px;
+    color: var(--muted);
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.8;
+  }
+  .card:nth-of-type(2) > div:not(.pad):not(.row) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 0;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  #lastCommand {
+    padding: 5px 11px;
+    border: 1px solid #353535;
+    border-radius: 7px;
+    color: var(--accent);
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+  }
+  #hello {
+    background: transparent;
+    border-style: dashed;
+    color: #aaa;
+  }
+  /* ข้อมูลตอบกลับ */
+  #received,
+  #log {
+    margin: 0;
+    padding: 15px;
+    border: 1px solid #242424;
+    border-radius: 12px;
+    background: var(--field);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, "Noto Sans Thai", monospace;
+    font-size: 12px;
+    line-height: 1.9;
+  }
+  #received {
+    min-height: 90px;
+    color: #d5f3ad;
+  }
+  #log {
+    height: 150px;
+    overflow-y: auto;
+    color: #8c8c8c;
+    scrollbar-width: thin;
+    scrollbar-color: #393939 transparent;
+  }
+  @media (max-width: 740px) {
+    main {
+      display: flex;
+      flex-direction: column;
+      padding: 28px 16px;
+      gap: 16px;
+    }
+    main > p {
+      margin: -8px 0 6px;
+    }
+    .card {
+      padding: 21px;
+      border-radius: 18px;
+    }
+    .pad {
+      min-height: 315px;
+      grid-template-columns: repeat(3, minmax(0, 82px));
+      gap: 10px;
+      margin-top: 24px;
+      padding: 18px;
+    }
+    .pad button {
+      height: 76px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+/* Visual feedback for held keyboard, mouse, or touch controls. */
+.pad button.active {
+  animation: keyPulse 0.7s ease-in-out infinite;
+}
+@keyframes keyPulse {
+  0%, 100% {
+    background: #bbf451;
+    border-color: #bbf451;
+    color: #111;
+    box-shadow: 0 0 6px rgb(187 244 81 / 20%);
+  }
+  50% {
+    background: #8dbb36;
+    border-color: #d8ff91;
+    color: #111;
+    box-shadow: 0 0 20px rgb(187 244 81 / 40%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pad button.active { animation: none; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>Robot Control</h1>
+  <p>ควบคุม ESP32 ผ่าน Cloud MQTT</p>
+  <section class="card">
+    <h2>การเชื่อมต่อ</h2>
+    <label for="broker">Broker WSS URL</label>
+    <input id="broker"
+      placeholder="wss://YOUR-HOST:8084/mqtt"
+      autocomplete="off">
+    <label for="username">MQTT Username</label>
+    <input id="username" value="robot01" autocomplete="off">
+    <label for="password">MQTT Password</label>
+    <input id="password" type="password" autocomplete="off">
+    <div class="row">
+      <button id="connect" class="primary">เชื่อมต่อ</button>
+      <button id="disconnect" disabled>ตัดการเชื่อมต่อ</button>
+    </div>
+    <div id="connection" role="status">ยังไม่เชื่อมต่อ</div>
+  </section>
+  <section class="card">
+    <h2>ควบคุมหุ่นยนต์</h2>
+    <label for="speed">
+      ความเร็ว: <strong id="speedValue">120</strong> / 255
+    </label>
+    <input id="speed" type="range" min="0" max="255" value="120">
+    <div class="pad">
+      <span></span>
+      <button data-action="forward" aria-label="เดินหน้า W" disabled>W</button>
+      <span></span>
+      <button data-action="left" aria-label="เลี้ยวซ้าย A" disabled>A</button>
+      <button id="stop" class="danger stop" disabled>STOP</button>
+      <button data-action="right" aria-label="เลี้ยวขวา D" disabled>D</button>
+      <span></span>
+      <button data-action="backward" aria-label="ถอยหลัง S" disabled>S</button>
+      <span></span>
+    </div>
+    <p>กด W A S D ค้างเพื่อควบคุม · ปล่อยเพื่อหยุด · Space เพื่อหยุด</p>
+    <div>คำสั่งล่าสุด: <strong id="lastCommand">—</strong></div>
+    <div class="row">
+      <button id="hello" disabled>ทดสอบส่ง hello</button>
+    </div>
+  </section>
+  <section class="card">
+    <h2>ข้อมูลจาก ESP32</h2>
+    <div id="received">ยังไม่ได้รับข้อมูล</div>
+    <h3>บันทึกการเชื่อมต่อ</h3>
+    <div id="log"></div>
+  </section>
+</main>
+<script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const CMD_TOPIC = "robot01/cmd";
+const RX_TOPICS = [
+  "robot01/status",
+  "robot01/telemetry",
+  "robot01/ack"
+];
+let client = null;
+let ready = false;
+let timer = null;
+let activePointer = null;
+let sequence = 0;
+let lines = [];
+const directions = [...document.querySelectorAll("[data-action]")];
+function log(message) {
+  lines.push(new Date().toLocaleTimeString() + "  " + message);
+  lines = lines.slice(-30);
+  $("log").textContent = lines.join("\n");
+  $("log").scrollTop = $("log").scrollHeight;
+}
+function setReady(value) {
+  ready = value;
+  directions.forEach(button => button.disabled = !value);
+  $("stop").disabled = !value;
+  $("hello").disabled = !value;
+}
+function clearMovement() {
+  clearInterval(timer);
+  timer = null;
+  activePointer = null;
+  directions.forEach(button => button.classList.remove("active"));
+}
+function publish(payload) {
+  if (!ready || !client?.connected) return false;
+  client.publish(
+    CMD_TOPIC,
+    payload,
+    { qos: 0, retain: false },
+    error => {
+      if (error) log("ส่งไม่สำเร็จ: " + error.message);
+    }
+  );
+  return true;
+}
+function command(action) {
+  const speed = Number($("speed").value);
+  const payload = {
+    id: ++sequence,
+    action,
+    left: action === "stop" ? 0 : speed,
+    right: action === "stop" ? 0 : speed
+  };
+  if (publish(JSON.stringify(payload))) {
+    $("lastCommand").textContent = action;
+  }
+}
+function stopMovement() {
+  clearMovement();
+  command("stop");
+}
+function resetConnection(message) {
+  clearMovement();
+  setReady(false);
+  $("connection").textContent = message;
+  $("connection").style.color = "#fbbf24";
+  $("connect").disabled = false;
+  $("disconnect").disabled = true;
+  $("lastCommand").textContent = "—";
+}
+$("connect").onclick = () => {
+  if (client) return;
+  if (!window.mqtt) {
+    log("โหลด MQTT.js ไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตแล้วรีเฟรช");
+    return;
+  }
+  const url = $("broker").value.trim();
+  try {
+    if (new URL(url).protocol !== "wss:") {
+      throw new Error("กรุณาใช้ URL ที่ขึ้นต้นด้วย wss://");
+    }
+  } catch (error) {
+    log(error.message);
+    return;
+  }
+  $("connect").disabled = true;
+  $("disconnect").disabled = false;
+  $("connection").textContent = "กำลังเชื่อมต่อ...";
+  $("received").textContent = "รอข้อมูลจาก ESP32";
+  try {
+    client = mqtt.connect(url, {
+      username: $("username").value,
+      password: $("password").value,
+      clientId: "robot-web-" + Math.random().toString(16).slice(2),
+      protocolVersion: 4,
+      clean: true,
+      reconnectPeriod: 0,
+      connectTimeout: 10000,
+      queueQoSZero: false
+    });
+  } catch (error) {
+    client = null;
+    resetConnection("เชื่อมต่อไม่สำเร็จ");
+    log(error.message);
+    return;
+  }
+  const current = client;
+  current.on("connect", () => {
+    if (client !== current) return;
+    current.subscribe(RX_TOPICS, { qos: 0 }, (error, grants) => {
+      if (client !== current || !current.connected) return;
+      if (error || grants?.some(item => item.qos === 128)) {
+        log("สมัครรับข้อมูลไม่สำเร็จ ตรวจสิทธิ์ Topic");
+        current.end(true);
+        return;
+      }
+      setReady(true);
+      $("connection").textContent = "เชื่อมต่อ Broker แล้ว";
+      $("connection").style.color = "#4ade80";
+      log("เชื่อมต่อและสมัครรับข้อมูลสำเร็จ");
+      command("stop");
+    });
+  });
+  current.on("message", (topic, payload) => {
+    if (client !== current) return;
+    const text = payload.toString();
+    $("received").textContent = topic + "\n" + text;
+    log("รับ: " + text.slice(0, 200));
+  });
+  current.on("error", error => {
+    if (client !== current) return;
+    log("ผิดพลาด: " + error.message);
+    clearMovement();
+    setReady(false);
+    current.end(true);
+  });
+  current.on("close", () => {
+    if (client !== current) return;
+    client = null;
+    resetConnection("ไม่ได้เชื่อมต่อ");
+    log("การเชื่อมต่อสิ้นสุด");
+  });
+};
+$("disconnect").onclick = () => {
+  stopMovement();
+  setReady(false);
+  client?.end();
+};
+$("hello").onclick = () => {
+  stopMovement();
+  if (publish("hello")) log("ส่ง: hello");
+};
+$("speed").oninput = () => {
+  $("speedValue").textContent = $("speed").value;
+};
+directions.forEach(button => {
+  button.addEventListener("contextmenu", event => event.preventDefault());
+  button.addEventListener("pointerdown", event => {
+    if (!ready || activePointer !== null || event.button !== 0) return;
+    event.preventDefault();
+    activePointer = event.pointerId;
+    button.setPointerCapture(event.pointerId);
+    button.classList.add("active");
+    const action = button.dataset.action;
+    command(action);
+    timer = setInterval(() => command(action), 100);
+  });
+  const release = event => {
+    if (event.pointerId === activePointer) stopMovement();
+  };
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("lostpointercapture", release);
+});
+$("stop").onclick = stopMovement;
+window.addEventListener("blur", stopMovement);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopMovement();
+});
+const keyboardActions = {
+  KeyW: "forward",
+  KeyA: "left",
+  KeyS: "backward",
+  KeyD: "right"
+};
+function isEditing(target) {
+  return target instanceof Element && (
+    target.closest("input, textarea, select") || target.isContentEditable
+  );
+}
+window.addEventListener("keydown", event => {
+  if (isEditing(event.target)) return;
+  if (event.ctrlKey || event.altKey || event.metaKey) return;
+  const action = keyboardActions[event.code];
+  if (!action && event.code !== "Space") return;
+  event.preventDefault();
+  if (event.code === "Space") {
+    stopMovement();
+    return;
+  }
+  if (!ready || event.repeat) return;
+  if (activePointer !== null &&
+      !String(activePointer).startsWith("keyboard:")) return;
+  stopMovement();
+  activePointer = "keyboard:" + event.code;
+  const button = directions.find(item => item.dataset.action === action);
+  button?.classList.add("active");
+  command(action);
+  timer = setInterval(() => command(action), 100);
+});
+window.addEventListener("keyup", event => {
+  if (activePointer === "keyboard:" + event.code) {
+    event.preventDefault();
+    stopMovement();
+  }
+});
+document.addEventListener("focusin", event => {
+  if (isEditing(event.target) && activePointer !== null) stopMovement();
+});
+</script>
+</body>
+</html>

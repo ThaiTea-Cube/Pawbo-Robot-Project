@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e3e3df">
+  <title>PAWBO Control</title>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+  <div class="shell">
+    <nav class="topbar" aria-label="เมนูหลัก">
+      <a class="brand" href="#top"><span aria-hidden="true"></span>PAWBO</a>
+      <a href="#servo-panel">Servo</a>
+      <a href="#settings">ตั้งค่า</a>
+      <a class="nav-connect" href="#connection-panel">MQTT <span aria-hidden="true">↗</span></a>
+    </nav>
+
+    <main id="top" class="console">
+      <header class="hero panel">
+        <h1>
+          <span class="sr-only">PAWBO Control</span>
+          <svg viewBox="-1 -1 28.1 8" aria-hidden="true" focusable="false">
+            <path d="M0 6V0H3L4 1V2L3 3H.9 M5.55 6V1.5L7.05 0H8.05L9.55 1.5V6 M6.46 3.6H8.64 M11.1 0V5L12.1 6H14.1L15.1 5V0 M13.1 5.08V2.4 M16.65 6V0H19.65L20.65 1V2L19.65 3 M17.55 3H19.65L20.65 4V5L19.65 6H17.55 M23.2 0H25.2L26.2 1V5L25.2 6H23.2L22.2 5V1Z"/>
+          </svg>
+        </h1>
+        <p class="hero-caption">ROBOT CONTROL <span>V1</span></p>
+      </header>
+
+      <section id="status-panel" class="panel status" aria-labelledby="status-title">
+        <div class="status-head">
+          <h2 id="status-title">สถานะหุ่นยนต์</h2>
+          <span class="device">robot01</span>
+        </div>
+        <div class="status-scene" aria-hidden="true">
+          <div class="robot">
+            <i class="leg left l1"></i><i class="leg left l2"></i><i class="leg left l3"></i><i class="leg left l4"></i>
+            <i class="leg right l1"></i><i class="leg right l2"></i><i class="leg right l3"></i><i class="leg right l4"></i>
+            <div class="robot-body"><i></i><i></i></div>
+          </div>
+        </div>
+        <p id="online" class="live-state" role="status">รอข้อมูล</p>
+      </section>
+
+      <section id="connection-panel" class="panel connection" aria-labelledby="connection-title">
+        <h2 id="connection-title">เชื่อมต่อ MQTT</h2>
+        <form id="connection" class="fields login">
+          <label>บัญชีเว็บ<input id="username" name="username" value="paw" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+          <label>รหัสผ่าน<input id="password" name="password" type="password" autocomplete="current-password" required></label>
+          <button class="primary" id="connect" type="submit">เชื่อมต่อ</button>
+          <button id="disconnect" type="button" disabled>ตัดการเชื่อมต่อ</button>
+        </form>
+        <p class="hint" id="broker" role="status">ยังไม่ได้เชื่อมต่อ</p>
+      </section>
+
+      <section id="servo-panel" class="panel servo" aria-labelledby="servo-title">
+        <div class="section-head">
+          <h2 id="servo-title">ทดสอบ Servo</h2>
+          <button class="stop" id="stop" type="button" disabled>STOP · ตัด PWM</button>
+        </div>
+        <label>เลือก Servo
+          <select id="servo" disabled>
+            <option value="1">1 · CH0</option><option value="2">2 · CH1</option>
+            <option value="3">3 · CH2</option><option value="4">4 · CH3</option>
+            <option value="5">5 · CH4</option><option value="6">6 · CH5</option>
+            <option value="7">7 · CH6</option><option value="8">8 · CH7</option>
+          </select>
+        </label>
+        <div class="angle"><label for="angle">มุมทดสอบ</label><output id="degrees" for="angle">90°</output></div>
+        <input id="angle" type="range" min="75" max="105" step="1" value="90" aria-describedby="servo-hint" disabled>
+        <div class="range-labels" aria-hidden="true"><span>75°</span><span>105°</span></div>
+        <button class="primary" id="move" type="button" disabled>ส่งมุมที่เลือก</button>
+        <p class="hint" id="servo-hint">ส่งเมื่อปล่อยแถบเลื่อน หุ่นตัด PWM หลัง 650 มิลลิวินาที</p>
+      </section>
+
+      <div id="settings" class="settings">
+        <section class="panel" aria-labelledby="alarm-title">
+          <h2 id="alarm-title">ตั้งปลุกทุกวัน</h2>
+          <form id="alarm" class="fields alarm-fields">
+            <label>เวลาไทย<input type="time" id="alarmTime" required disabled></label>
+            <label class="check"><input type="checkbox" id="alarmEnabled" disabled> เปิดปลุก</label>
+            <button class="primary" id="save" type="submit" disabled>บันทึก</button>
+          </form>
+        </section>
+        <section class="panel" aria-labelledby="eyes-title">
+          <h2 id="eyes-title">เลือกหน้าตา</h2>
+          <div class="fields eye-fields">
+            <label>แบบตา
+              <select id="eyes" disabled>
+                <option value="0">Widow Core</option><option value="1">Ion Hunter</option>
+                <option value="2">Void Eclipse</option><option value="3">Kitsune Ember</option>
+                <option value="4">Ghost Sonar</option><option value="5">Glitch Hex</option>
+              </select>
+            </label>
+            <button class="primary" id="applyEyes" type="button" disabled>แสดงบนจอหุ่น</button>
+          </div>
+        </section>
+      </div>
+      <section class="panel telemetry" aria-labelledby="telemetry-title">
+        <h2 id="telemetry-title">ข้อมูลจากหุ่น</h2>
+        <dl>
+          <dt>สถานะ</dt><dd id="state">—</dd>
+          <dt>Servo / มุมที่สั่ง</dt><dd id="servoState">—</dd>
+          <dt>Wi‑Fi / เวลาเปิดเครื่อง</dt><dd id="signal">—</dd>
+          <dt>การซิงก์เวลา</dt><dd id="clock">—</dd>
+          <dt>นาฬิกาปลุก</dt><dd id="alarmState">—</dd>
+          <dt>แบบตา</dt><dd id="eyeState">—</dd>
+        </dl>
+      </section>
+
+      <p class="feedback" id="feedback" role="status"></p>
+    </main>
+  </div>
+  <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js"></script>
+  <script src="control.js"></script>
+</body>
+</html>

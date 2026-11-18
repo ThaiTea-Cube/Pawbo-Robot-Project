@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="th">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pawbo · Eye Lab</title>
+<style>
+  :root{color-scheme:dark;--ink:#eceaf0;--muted:#a6a3b2;--line:#2b2934;--accent:#fb5a65;font-family:"DM Sans","Segoe UI",Tahoma,sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;background:#101015;color:var(--ink)}
+  button{font:inherit;color:inherit;cursor:pointer}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  main{width:min(1200px,100%);margin:auto;padding:38px clamp(16px,4vw,56px)}
+  header{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:28px}
+  .eyebrow,.spec,figcaption{font-family:"IBM Plex Mono",monospace;font-size:.75rem;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  h1{font-size:clamp(2.45rem,7vw,5.5rem);line-height:1;margin:10px 0 0;letter-spacing:-.065em}
+  h2,p,figure{margin:0}
+  .layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr);gap:clamp(20px,4vw,44px)}
+  .stage{background:#17171f;border:1px solid var(--line);border-radius:18px;padding:clamp(14px,3vw,31px)}
+  .stage-head{display:flex;justify-content:space-between;align-items:start;gap:10px;margin-bottom:20px}
+  .stage-head h2{font-size:clamp(1.35rem,3vw,2.1rem);letter-spacing:-.04em;color:var(--accent)}
+  .spec{white-space:nowrap;margin-top:7px}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:clamp(6px,1.6vw,16px)}
+  .pair canvas{width:100%;display:block;aspect-ratio:1;background:#07060b;border:1px solid #3b3745;border-radius:10px}
+  figcaption{padding-top:8px}
+  .desc{min-height:3em;color:var(--muted);line-height:1.6;margin-top:18px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .controls button{min-height:44px;background:#211f2a;border:1px solid var(--line);border-radius:8px;padding:0 13px}
+  .controls button:hover,.variant:hover{border-color:var(--accent)}
+  aside h2{font-size:1.1rem;margin:2px 0 15px}
+  .catalog{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .variant{display:grid;gap:9px;text-align:left;min-width:0;background:#17171f;border:1px solid var(--line);border-radius:10px;padding:8px}
+  .variant[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+  .variant canvas{width:100%;display:block;aspect-ratio:2;background:#07060b;border-radius:5px}
+  .variant span{padding:0 3px 3px;overflow-wrap:anywhere}
+  @media(max-width:710px){.layout{grid-template-columns:1fr}.catalog{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media(max-width:390px){.catalog{grid-template-columns:repeat(2,minmax(0,1fr))}.stage-head{flex-wrap:wrap}}
+</style>
+<main>
+  <header><div class="eyebrow">PAWBO / TFT</div><h1>Eye Lab</h1></header>
+  <div class="layout">
+    <section class="stage" aria-labelledby="eye-name">
+      <div class="stage-head"><h2 id="eye-name" aria-live="polite"></h2><span class="spec">240 × 240 / TFT</span></div>
+      <div class="pair">
+        <figure><canvas id="left" width="240" height="240" aria-label="พรีวิวตาจอซ้าย" role="img"></canvas><figcaption>LEFT / GPIO32</figcaption></figure>
+        <figure><canvas id="right" width="240" height="240" aria-label="พรีวิวตาจอขวา" role="img"></canvas><figcaption>RIGHT / GPIO33</figcaption></figure>
+      </div>
+      <p class="desc" id="description"></p>
+      <div class="controls">
+        <button id="prev" type="button" aria-label="แบบก่อนหน้า">←</button>
+        <button id="next" type="button" aria-label="แบบถัดไป">→</button>
+        <button id="motion" type="button">หยุดแอนิเมชัน</button>
+      </div>
+    </section>
+    <aside aria-labelledby="catalog-title"><h2 id="catalog-title">เลือกแบบตา</h2><div class="catalog" id="catalog"></div></aside>
+  </div>
+</main>
+<script>
+  "use strict";
+  const TAU = Math.PI * 2;
+  const circle = (c, x, y, r, color) => { c.fillStyle=color; c.beginPath(); c.arc(x,y,r,0,TAU); c.fill(); };
+  const ring = (c,x,y,r,color,width=1,from=0,to=TAU) => {
+    c.strokeStyle=color; c.lineWidth=width; c.beginPath(); c.arc(x,y,r,from,to); c.stroke();
+  };
+  const path = (c,points,color,width=1) => {
+    c.strokeStyle=color; c.lineWidth=width; c.beginPath();
+    points.forEach(([x,y],i) => i ? c.lineTo(x,y) : c.moveTo(x,y)); c.stroke();
+  };
+  const polygon = (c,points,color) => {
+    c.fillStyle=color; c.beginPath();
+    points.forEach(([x,y],i) => i ? c.lineTo(x,y) : c.moveTo(x,y)); c.closePath(); c.fill();
+  };
+  function glow(c,x,y,r,color) {
+    const fill=c.createRadialGradient(x,y,2,x,y,r);
+    fill.addColorStop(0,color); fill.addColorStop(1,"transparent");
+    circle(c,x,y,r,fill);
+  }
+
+  function spider(c,t,side) {
+    const mx=x=>side ? 240-x : x;
+    const spokes=[[0,175],[45,170],[105,138],[153,84],[175,0]];
+    spokes.forEach(([x,y])=>path(c,[[mx(0),0],[mx(x),y]],"#552437"));
+    for(let k=1;k<=5;k++) path(c,spokes.map(([x,y])=>[mx(x*k/5),y*k/5]),"#382032");
+    const breath=(Math.sin(t*2.3)+1)/2;
+    [[49,64,16],[110,43,18],[40,133,13],[142,137,62]].forEach(([x,y,r])=>{
+      x=mx(x);
+      glow(c,x,y,r+16,"#8b102f");
+      circle(c,x,y,r,"#240817"); ring(c,x,y,r-2,"#a92143",2);
+      circle(c,x,y,r*.76,`hsl(${349+breath*10} 83% ${37+breath*16}%)`);
+      polygon(c,[[x,y-r*.74],[x+r*.23,y],[x,y+r*.74],[x-r*.23,y]],"#120812");
+      circle(c,x-r*.29,y-r*.27,Math.max(2,r*.09),"#ffd5bb");
+    });
+  }
+
+  function ion(c,t,side) {
+    const x=120+Math.sin(t*1.7+side*.2)*10, y=120;
+    glow(c,x,y,103,"#173d68");
+    for(let n=0;n<24;n++){
+      const a=n*TAU/24;
+      path(c,[[x+Math.cos(a)*77,y+Math.sin(a)*77],[x+Math.cos(a)*83,y+Math.sin(a)*83]],n%3?"#254356":"#7ee9fa",n%3?1:2);
+    }
+    ring(c,x,y,64,"#2d6076",2);
+    for(let n=0;n<3;n++){
+      const a=t*.8*(side?-1:1)+n*TAU/3;
+      ring(c,x,y,58,"#66efff",5,a,a+1.26);
+    }
+    ring(c,x,y,41,"#34a8c5",2,-t,-t+4.5);
+    circle(c,x,y,24,"#153a51"); circle(c,x,y,13,"#9cf7ff"); circle(c,x,y,6,"#f0ffff");
+    path(c,[[x-35,y],[x-26,y]],"#83e9f5",2); path(c,[[x+26,y],[x+35,y]],"#83e9f5",2);
+  }
+
+  function eclipse(c,t,side) {
+    const x=120+Math.sin(t*.85+side)*7,y=120;
+    glow(c,x,y,105,"#4a246d");
+    ring(c,x,y,79,"#2c1b41",2);
+    ring(c,x,y,63,"#6741a3",3);
+    ring(c,x,y,58,"#e0b7ff",4,-1.1+t*.43,2.6+t*.43);
+    circle(c,x-7,y-4,52,"#080711");
+    ring(c,x-7,y-4,50,"#261837",1);
+    for(let i=0;i<3;i++){
+      const a=t*(.35+i*.18)+i*2.18;
+      circle(c,x+Math.cos(a)*79,y+Math.sin(a)*79,2+i,"#e2beff");
+    }
+  }
+
+  function kitsune(c,t,side) {
+    const mirror=x=>side ? 240-x : x;
+    const shape=(p,color)=>polygon(c,p.map(([x,y])=>[mirror(x),y]),color);
+    const light=4*Math.sin(t*2);
+    glow(c,120,118,112,"#682627");
+    shape([[17,83],[72,86],[133,103],[223,128],[165,156],[78,143]],"#2b0c16");
+    shape([[26,88],[87,94],[223,128],[161,145],[83,133]],"#b4392d");
+    shape([[39,92],[99,105],[214,128],[150,133],[91,124]],"#ff8a36");
+    shape([[108,107],[144,113],[135+light,133],[123+light,136]],"#1c0b18");
+    shape([[36,73],[66,77],[96,88],[63,84]],"#ff5e47");
+    shape([[52,148],[99,161],[117,167],[80,165]],"#bb4056");
+    shape([[60,169],[90,177],[101,184],[72,179]],"#743149");
+  }
+
+  function sonar(c,t,side) {
+    const x=120,y=120, angle=t*1.1+(side ? .55 : 0);
+    glow(c,x,y,110,"#164e3a");
+    for(const r of [26,46,66,86]) ring(c,x,y,r,"#1d604b",1);
+    path(c,[[x-89,y],[x+89,y]],"#285a50"); path(c,[[x,y-89],[x,y+89]],"#285a50");
+    for(let i=0;i<13;i++){
+      const a=angle-i*.052, alpha=1-i/13;
+      path(c,[[x,y],[x+Math.cos(a)*86,y+Math.sin(a)*86]],`rgba(107,255,167,${alpha*.8})`,i===0?3:2);
+    }
+    for(const [a,r] of [[.6,62],[2.8,51],[-1.2,73]]){
+      const age=((angle-a)%TAU+TAU)%TAU;
+      circle(c,x+Math.cos(a)*r,y+Math.sin(a)*r,3,`rgba(148,255,196,${.22+.7*Math.exp(-age)})`);
+    }
+    circle(c,x,y,8,"#23674b"); circle(c,x,y,3,"#adffd1");
+  }
+
+  function glitch(c,t,side) {
+    const frame=Math.floor(t*9), jitter=frame%17<3 ? Math.sin(frame*12+side)*15 : 0;
+    glow(c,120,120,104,"#591b4b");
+    for(let y=50;y<197;y+=6) path(c,[[35,y],[205,y]],y%5?"#20152b":"#392147");
+    const base=[[38,123],[70,87],[153,77],[203,113],[176,154],[83,165]];
+    [[-5,"#26d9e3"],[5,"#f046a6"],[0,"#100b1e"]].forEach(([shift,color])=>{
+      polygon(c,base.map(([x,y])=>[x+shift+jitter,y+shift]),color);
+    });
+    path(c,[[52+jitter,129],[86+jitter,93],[151+jitter,89],[188+jitter,113]],"#f0a6ee",3);
+    polygon(c,[[120+jitter,95],[147+jitter,120],[120+jitter,147],[93+jitter,120]],"#f043a1");
+    polygon(c,[[120+jitter,106],[134+jitter,120],[120+jitter,135],[105+jitter,120]],"#210f2f");
+    for(let i=0;i<5;i++){
+      const y=58+i*32, x=22+(frame*19+i*53+side*11)%150;
+      c.fillStyle=i%2 ? "#45e4e8" : "#ee3ea7"; c.fillRect(x,y,24,2);
+    }
+  }
+
+  const designs=[
+    {name:"Widow Core",color:"#ff647a",background:"#10080f",draw:spider,note:"ตาแมงมุม 8 ดวงบนใยสีเลือดหมู จังหวะเรืองแดงช้า ๆ เหมือนกำลังเฝ้ามอง"},
+    {name:"Ion Hunter",color:"#71ecff",background:"#071421",draw:ion,note:"เลนส์ไซเบอร์สีฟ้าพร้อมวงแหวนหมุนสวนกัน แกนตาเล็งไปมาเบา ๆ"},
+    {name:"Void Eclipse",color:"#d3a8ff",background:"#0b0814",draw:eclipse,note:"วงแหวนคราสสีม่วงล้อมแกนมืด มีจุดแสงโคจรเหมือนแรงโน้มถ่วงกำลังดึงเข้าหา"},
+    {name:"Kitsune Ember",color:"#ff9b55",background:"#160911",draw:kitsune,note:"ตาจิ้งจอกทรงเฉียง ลายหน้ากากสีแดงและเส้นแสงสีส้มเหมือนถ่านไฟ"},
+    {name:"Ghost Sonar",color:"#93ffbb",background:"#061513",draw:sonar,note:"เรดาร์สีเขียวมืดสองจอ กวาดหาสัญญาณแล้วปล่อยให้จุดเป้าหมายค่อย ๆ จาง"},
+    {name:"Glitch Hex",color:"#ff77c8",background:"#100919",draw:glitch,note:"ตาเหลี่ยมสีชมพู–ฟ้าแยกขอบ สลับจังหวะสัญญาณรบกวนบนเส้นสแกน"}
+  ];
+
+  const canvasPair=[document.getElementById("left"),document.getElementById("right")];
+  const gallery=document.getElementById("catalog");
+  const title=document.getElementById("eye-name");
+  const description=document.getElementById("description");
+  const motion=document.getElementById("motion");
+  const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)");
+  let selected=0, playing=!reduceMotion.matches, elapsed=0, lastFrame=0, animation=0;
+  const buttons=[];
+
+  function paint(c,design,t,side){
+    c.fillStyle=design.background; c.fillRect(0,0,240,240); design.draw(c,t,side);
+  }
+  function draw(){
+    canvasPair.forEach((canvas,side)=>paint(canvas.getContext("2d"),designs[selected],elapsed,side));
+  }
+  function select(index){
+    selected=(index+designs.length)%designs.length;
+    const design=designs[selected];
+    document.documentElement.style.setProperty("--accent",design.color);
+    title.textContent=design.name;
+    description.textContent=design.note;
+    buttons.forEach((button,i)=>button.setAttribute("aria-pressed",String(i===selected)));
+    elapsed=0;
+    draw();
+  }
+  function tick(timestamp){
+    elapsed+=lastFrame ? Math.min(timestamp-lastFrame,50)/1000 : 0;
+    lastFrame=timestamp;
+    draw();
+    animation=requestAnimationFrame(tick);
+  }
+  function setMotion(enabled){
+    playing=enabled;
+    cancelAnimationFrame(animation);
+    lastFrame=0;
+    motion.textContent=playing ? "หยุดแอนิเมชัน" : "เล่นแอนิเมชัน";
+    if(playing) animation=requestAnimationFrame(tick);
+  }
+  designs.forEach((design,index)=>{
+    const button=document.createElement("button");
+    button.type="button"; button.className="variant";
+    const thumb=document.createElement("canvas");
+    thumb.width=160; thumb.height=80; thumb.setAttribute("aria-hidden","true");
+    const c=thumb.getContext("2d");
+    for(let side=0;side<2;side++){
+      c.save(); c.translate(side*80,0); c.scale(1/3,1/3); paint(c,design,1,side); c.restore();
+    }
+    const label=document.createElement("span");
+    label.textContent=design.name;
+    button.append(thumb,label);
+    button.addEventListener("click",()=>select(index));
+    gallery.append(button); buttons.push(button);
+  });
+  document.getElementById("prev").addEventListener("click",()=>select(selected-1));
+  document.getElementById("next").addEventListener("click",()=>select(selected+1));
+  motion.addEventListener("click",()=>setMotion(!playing));
+  reduceMotion.addEventListener("change",event=>setMotion(!event.matches));
+  select(0);
+  setMotion(playing);
+</script>
+</html>
